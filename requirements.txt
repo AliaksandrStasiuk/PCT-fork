@@ -12,3 +12,4 @@ pycocotools
 scipy
 timm
 albumentations
+tqdm

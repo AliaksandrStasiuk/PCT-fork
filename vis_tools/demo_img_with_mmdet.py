@@ -17,6 +17,8 @@ from mmcv.runner import load_checkpoint
 from mmpose.apis import (inference_top_down_pose_model, process_mmdet_results)
 from mmpose.datasets import DatasetInfo
 from models import build_posenet
+from pathlib import Path
+from tqdm import tqdm
 
 
 # try:
@@ -134,7 +136,8 @@ def vis_pose_result(image_name, pose_results, thickness, out_file):
     plt.subplots_adjust(top=1,bottom=0,left=0,right=1,hspace=0,wspace=0)        
     plt.margins(0,0)
 
-    plt.savefig(out_file + '.pdf', format='pdf', bbox_inches='tight', dpi=100)
+    # plt.savefig(out_file + '.pdf', format='pdf', bbox_inches='tight', dpi=100)
+    plt.savefig(out_file + '.png', bbox_inches='tight')
     plt.close()
     
     
@@ -213,7 +216,7 @@ def main():
     args = parser.parse_args()
 
     assert args.show or (args.out_img_root != '')
-    assert args.img != ''
+    # assert args.img != ''
     assert args.det_config is not None
     assert args.det_checkpoint is not None
 
@@ -233,45 +236,50 @@ def main():
     else:
         dataset_info = DatasetInfo(dataset_info)
 
-    image_name = os.path.join(args.img_root, args.img)
-
-    # test a single image, the resulting box is (x1, y1, x2, y2)
-    mmdet_results = inference_detector(det_model, image_name)
-
-    # keep the person class bounding boxes.
-    person_results = process_mmdet_results(mmdet_results, args.det_cat_id)
-
-    # test a single image, with a list of bboxes.
-
-    # optional
-    return_heatmap = False
-
-    # e.g. use ('backbone', ) to return backbone feature
-    output_layer_names = None
-
-    pose_results, returned_outputs = inference_top_down_pose_model(
-        pose_model,
-        image_name,
-        person_results,
-        bbox_thr=args.bbox_thr,
-        format='xyxy',
-        dataset=dataset,
-        dataset_info=dataset_info,
-        return_heatmap=return_heatmap,
-        outputs=output_layer_names)
-
-    if args.out_img_root == '':
-        out_file = None
+    if args.img == '':
+        pathlist = [(image_name, os.path.join(args.img_root, image_name)) for image_name in os.listdir(args.img_root)]
     else:
-        os.makedirs(args.out_img_root, exist_ok=True)
-        out_file = os.path.join(args.out_img_root, f'vis_{args.img[:-4]}')
+        pathlist = [(args.img, os.path.join(args.img_root, args.img))]
 
-    # show the results
-    vis_pose_result(
-        image_name,
-        pose_results,
-        thickness=args.thickness,
-        out_file=out_file)
+    for image_name, image_path in tqdm(pathlist):
+
+        # test a single image, the resulting box is (x1, y1, x2, y2)
+        mmdet_results = inference_detector(det_model, image_path)
+
+        # keep the person class bounding boxes.
+        person_results = process_mmdet_results(mmdet_results, args.det_cat_id)
+
+        # test a single image, with a list of bboxes.
+
+        # optional
+        return_heatmap = False
+
+        # e.g. use ('backbone', ) to return backbone feature
+        output_layer_names = None
+
+        pose_results, returned_outputs = inference_top_down_pose_model(
+            pose_model,
+            image_path,
+            person_results,
+            bbox_thr=args.bbox_thr,
+            format='xyxy',
+            dataset=dataset,
+            dataset_info=dataset_info,
+            return_heatmap=return_heatmap,
+            outputs=output_layer_names)
+
+        if args.out_img_root == '':
+            out_file = None
+        else:
+            os.makedirs(args.out_img_root, exist_ok=True)
+            out_file = os.path.join(args.out_img_root, f'vis_{image_name[:-4]}')
+
+        # show the results
+        vis_pose_result(
+            image_path,
+            pose_results,
+            thickness=args.thickness,
+            out_file=out_file)
 
 
 if __name__ == '__main__':
